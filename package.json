@@ -1,0 +1,24 @@
+{
+  "name": "@reserve-io/root",
+  "version": "1.0.0",
+  "description": "interview task",
+  "author": "Tan Guven",
+  "license": "MIT",
+  "private": true,
+  "keywords": [],
+  "workspaces": [
+    "pkg/*"
+  ],
+  "scripts": {
+    "purge:node-modules": "find . -name 'node_modules' -type d -prune -exec rm -rf '{}' +",
+    "test:server:unit": "pnpm --filter=@reserve-io/api test:unit",
+    "test:server:integration": "docker compose -f docker-compose-test.yml up -d && pnpm --filter=@reserve-io/api test:integration && docker compose -f docker-compose-test.yml down",
+    "preinstall": "npx only-allow pnpm"
+  },
+  "devDependencies": {
+    "esbuild": "^0.21.5",
+    "prettier": "^3.3.2",
+    "rimraf": "^5.0.7",
+    "typescript": "^5.5.2"
+  }
+}

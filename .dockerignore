@@ -1,0 +1,17 @@
+.git
+scripts
+**/node_modules
+**/dist
+**/coverage
+**/.next
+**/.env
+**/*docker-compose*
+**/*.md
+Dockerfile*
+.dockerignore
+**/.gitignore
+LICENSE
+.vscode
+.editorconfig
+.idea
+**/*.nodemon.json

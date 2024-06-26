@@ -1,0 +1,8 @@
+services:
+  redis:
+    image: "redis:7.2.5-alpine3.20"
+    ports:
+      - "6379:6379"
+    volumes:
+      - ./scripts/redis/:/usr/local/etc/redis/
+    command: ["redis-server", "/usr/local/etc/redis/redis.conf"]

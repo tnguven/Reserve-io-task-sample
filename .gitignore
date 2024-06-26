@@ -1,0 +1,14 @@
+node_modules/
+dist
+.env
+.idea/
+jest-stare
+*.tsbuildinfo
+.DS_Store
+coverage
+*.log
+.vscode/settings.json
+logs
+*.log
+npm-debug.log*
+lerna-debug.log*

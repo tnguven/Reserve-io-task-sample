@@ -1,0 +1,59 @@
+services:
+  redis:
+    image: "redis:7.2.5-alpine3.20"
+    ports:
+      - "6379:6379"
+    volumes:
+      - ./scripts/redis/:/usr/local/etc/redis/
+      - redis-data:/data
+    command: [ "redis-server", "/usr/local/etc/redis/redis.conf" ]
+    networks:
+      - task-network
+
+  cors:
+    build:
+      context: ./pkg/cors
+      dockerfile: Dockerfile
+    container_name: proxy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    networks:
+      - task-network
+    depends_on:
+      - api
+
+  api:
+    restart: always
+    deploy:
+      mode: replicated
+      replicas: 3
+    build:
+      context: .
+      dockerfile: Dockerfile.server
+    environment:
+      - TOKEN_SECRET=$TOKEN_SECRET
+      - PORT=$PORT
+      - REDIS_HOST=$REDIS_HOST
+      - REDIS_PORT=$REDIS_PORT
+      - ENABLE_SWAGGER=$ENABLE_SWAGGER
+      - SWAGGER_TARGET=$SWAGGER_TARGET
+      - RATE_WINDOW_MS=$RATE_WINDOW_MS
+      - RATE_LIMIT=$RATE_LIMIT
+      - RATE_LEGACY_HEADER=$RATE_LEGACY_HEADER
+      - MAX_HOLDS_PER_USER=$MAX_HOLDS_PER_USER
+      - HOLD_DURATION=$HOLD_DURATION
+      - NODE_ENV=$NODE_ENV
+    command: [ "sh", "-c", "node ./dist/main.js" ]
+    networks:
+      - task-network
+    depends_on:
+      - redis
+
+volumes:
+  redis-data:
+    driver: local
+
+networks:
+  task-network:
+    driver: bridge
