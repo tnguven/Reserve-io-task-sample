@@ -6,7 +6,7 @@ import {
   getEvents,
   getSeats,
   holdSeat,
-  reserveEvent,
+  reserveSeat,
   refreshHold,
   CreateEventSchema,
   GetEventIdParamSchema,
@@ -43,7 +43,7 @@ eventsRouter
   .route("/:eventId/seats/:seatId/reserve")
   .put(
     validate(HoldEventSchema),
-    makeExpressCallback<EmptyObj, { seatId: string; eventId: string }>(reserveEvent),
+    makeExpressCallback<EmptyObj, { seatId: string; eventId: string }>(reserveSeat),
   );
 
 eventsRouter

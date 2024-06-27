@@ -1,6 +1,7 @@
-# A sample task for reserve a seat from an event
+# A sample task for reserve seats from an event
 
-Sample application for a small task. Nodejs for server and redis for primary-db.
+Sample application for a small task. Nodejs for server and redis for primary-db. 
+I setup a monorepo structure just to be ready to extend with client.
 
 ## Main folder structure
 
@@ -9,7 +10,7 @@ scripts\                # Initialize script for redis config
 pkg\            
    |--cors\             # Nginx reverse proxy setup
    |--server\           # Express server
-docker-compose.dev.yml  # main orchestrator
+docker-compose.yml      # main orchestrator
 docker-compose-test.yml # run redis as integration tests deps
 Dockerfile.server       # Server image
 Makefile                # main works
@@ -17,8 +18,13 @@ Makefile                # main works
 
 ### Quick start
 
-makefile support is one of a dependency to run prepared command. Make start will run the database and all the apps. When its done
-just visit the http://localhost to render the login page.
+makefile support is one of a dependency to run prepared command. Make start will run the redis and the server.
+After server run these are the endpoint to interact with
+
+- `localhost/docs` for swagger ui
+- `localhost/docs-json` for getting the endpoints definition as json
+- `localhost/api` the rest of the endpoints lives under api
+
 
 ``` makefile
 make start
@@ -36,10 +42,8 @@ docker compose -f docker-compose.dev.yml up -d
 
 ``` json
 "scripts": {
-  "test:unit": "pnpm run test:server:unit && pnpm run test:client:unit",
-  "test:server:unit": "pnpm --filter=@task/api test:unit",
-  "test:client:unit": "pnpm --filter=@task/client test:unit",
-  "test:server:integration": "docker compose -f docker-compose-test.yml up -d && pnpm --filter=@task/api test:integration && docker compose -f docker-compose-test.yml down",
+  "test:server:unit": "pnpm --filter=@reserve-io/api test:unit",
+  "test:server:integration": "docker compose -f docker-compose-test.yml up -d && pnpm --filter=@reserve-io/api test:integration && docker compose -f docker-compose-test.yml down",
 },
 ```
 
@@ -52,8 +56,6 @@ pnpm run test:server:integration # to run the supertest for server api
 ```
 
 ### .env
-
-Default I set up env for make the local stuff works. DOMAIN will be responsible for shortUrl prefix.
 
 ```dotenv
 REDIS_HOST=redis

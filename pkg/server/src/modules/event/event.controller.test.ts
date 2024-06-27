@@ -1,4 +1,4 @@
-import { describe, test, expect, vi, beforeAll } from "vitest";
+import { describe, test, expect, vi, beforeAll, afterEach } from "vitest";
 
 import {
   makeCreateEvent,
@@ -6,6 +6,8 @@ import {
   makeGetEvents,
   makeGetSeats,
   makeHoldSeat,
+  makeReserveSeat,
+  makeRefreshHold,
   type DepsType,
 } from "./event.controller";
 import type { EmptyObj, ReqObj } from "types";
@@ -42,6 +44,11 @@ describe("Event Controller", () => {
     content: "content",
     total_seats: 10,
   };
+  const user = { id: "userId" };
+
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
 
   describe("makeCreateEvent", () => {
     let getEvent: ReturnType<typeof makeGetEvent>;
@@ -125,7 +132,7 @@ describe("Event Controller", () => {
 
     test("must return statusCode 200 and events", async () => {
       mockEventService.getSeatsByEventId.mockResolvedValue(["seatId-1", "seatId-2"]);
-      const result = await getSeats({ params: { eventId: "eventId" }, user: { id: "id" } } as ReqObj<
+      const result = await getSeats({ params: { eventId: "eventId" }, user } as ReqObj<
         EmptyObj,
         { eventId: string }
       >);
@@ -137,7 +144,7 @@ describe("Event Controller", () => {
 
     test("must return statusCode 404", async () => {
       mockEventService.getSeatsByEventId.mockResolvedValue(null);
-      const result = await getSeats({ params: { eventId: "eventId" }, user: { id: "id" } } as ReqObj<
+      const result = await getSeats({ params: { eventId: "eventId" }, user } as ReqObj<
         EmptyObj,
         { eventId: string }
       >);
@@ -156,7 +163,7 @@ describe("Event Controller", () => {
 
     test("must return statusCode 404 when the seat does not exist", async () => {
       mockEventService.isExistingSeat.mockResolvedValue(false);
-      const result = await holdSeat({ params: { eventId: "eventId", seatId: "seatId" } } as ReqObj<
+      const result = await holdSeat({ params: { eventId: "eventId", seatId: "seatId" }, user } as ReqObj<
         EmptyObj,
         { seatId: string; eventId: string }
       >);
@@ -165,29 +172,148 @@ describe("Event Controller", () => {
       expect(result.body).toEqual({ msg: `Seat seatId does not exist.` });
     });
 
-    test("must return statusCode 404 when the seat does not exist", async () => {
+    test("must return statusCode 404 when the user reach the hold limit", async () => {
       mockEventService.isExistingSeat.mockResolvedValue(true);
       mockEventService.getUserHolds.mockResolvedValue([1, 2]);
-      const result = await holdSeat({ params: { eventId: "eventId", seatId: "seatId" } } as ReqObj<
+      const result = await holdSeat({ params: { eventId: "eventId", seatId: "seatId" }, user } as ReqObj<
         EmptyObj,
         { seatId: string; eventId: string }
       >);
 
       expect(result.statusCode).toBe(400);
-      expect(result.body).toEqual({ msg: `User can hold a maximum of ${limitsConfig.maxHoldsPerUser} seats.` });
+      expect(result.body).toEqual({
+        msg: `User can hold a maximum of ${limitsConfig.maxHoldsPerUser} seats.`,
+      });
     });
 
-    // test("must return statusCode 200 and events", async () => {
-    //   mockEventService.isExistingSeat.mockResolvedValue(true);
+    test("must return statusCode 404 when the seat is held or reserved", async () => {
+      mockEventService.isExistingSeat.mockResolvedValue(true);
+      mockEventService.getUserHolds.mockResolvedValue([]);
+      mockEventService.seatNotAvailable.mockResolvedValue(true);
+      const result = await holdSeat({ params: { eventId: "eventId", seatId: "seatId" }, user } as ReqObj<
+        EmptyObj,
+        { seatId: string; eventId: string }
+      >);
 
-    //   const result = await holdSeat({ params: { eventId: "eventId", seatId: "seatId" } } as ReqObj<
-    //     EmptyObj,
-    //     { seatId: string; eventId: string }
-    //   >);
+      expect(result.statusCode).toBe(400);
+      expect(result.body).toEqual({
+        msg: `Seat seatId not available.`,
+      });
+    });
 
-    //   expect(mockEventService.getSeatsByEventId).toHaveBeenCalled();
-    //   expect(result.statusCode).toBe(201);
-    //   expect(result.body).toEqual(["seatId-1", "seatId-2"]);
-    // });
+    test("must hold seat", async () => {
+      mockEventService.isExistingSeat.mockResolvedValue(true);
+      mockEventService.getUserHolds.mockResolvedValue([]);
+      mockEventService.seatNotAvailable.mockResolvedValue(false);
+      const result = await holdSeat({ params: { eventId: "eventId", seatId: "seatId" }, user } as ReqObj<
+        EmptyObj,
+        { seatId: string; eventId: string }
+      >);
+
+      expect(mockEventService.holdSeat).toHaveBeenCalled();
+      expect(result.statusCode).toBe(201);
+      expect(result.body).toEqual({
+        msg: `Seat seatId held for user userId.`,
+      });
+    });
+  });
+
+  describe("makeReserveSeat", () => {
+    let reserveSeat: ReturnType<typeof makeReserveSeat>;
+
+    beforeAll(() => {
+      reserveSeat = makeReserveSeat(deps);
+    });
+
+    test("must return 404 when the seat is not held anymore", async () => {
+      mockEventService.getHeldBy.mockResolvedValue(null);
+      const result = await reserveSeat({ params: { seatId: "seatId", eventId: "eventId" }, user } as ReqObj<
+        EmptyObj,
+        { seatId: string; eventId: string }
+      >);
+
+      expect(mockEventService.getHeldBy).toHaveBeenCalled();
+      expect(result.statusCode).toBe(404);
+      expect(result.body).toEqual({
+        msg: `Seat seatId can not be found in hold.`,
+      });
+    });
+
+    test("must return 406 when the seat is not held by the user", async () => {
+      mockEventService.getHeldBy.mockResolvedValue("userId-1");
+      const result = await reserveSeat({ params: { seatId: "seatId", eventId: "eventId" }, user } as ReqObj<
+        EmptyObj,
+        { seatId: string; eventId: string }
+      >);
+
+      expect(mockEventService.getHeldBy).toHaveBeenCalled();
+      expect(result.statusCode).toBe(406);
+      expect(result.body).toEqual({
+        msg: `Seat is not held by the user.`,
+      });
+    });
+
+    test("must reserve the seat with 201", async () => {
+      mockEventService.getHeldBy.mockResolvedValue("userId");
+      const result = await reserveSeat({ params: { seatId: "seatId", eventId: "eventId" }, user } as ReqObj<
+        EmptyObj,
+        { seatId: string; eventId: string }
+      >);
+
+      expect(mockEventService.getHeldBy).toHaveBeenCalled();
+      expect(mockEventService.reserveSeat).toHaveBeenCalled();
+      expect(result.statusCode).toBe(201);
+      expect(result.body).toEqual({
+        msg: `Seat seatId reserved for user userId.`,
+      });
+    });
+  });
+
+  describe("makeRefreshHold", () => {
+    let refreshHold: ReturnType<typeof makeRefreshHold>;
+
+    beforeAll(() => {
+      refreshHold = makeRefreshHold(deps);
+    });
+
+    test("must return 404 when the seat is not held anymore", async () => {
+      mockEventService.getHeldBy.mockResolvedValue(null);
+      const result = await refreshHold({ params: { seatId: "seatId", eventId: "eventId" }, user } as ReqObj<
+        EmptyObj,
+        { seatId: string; eventId: string }
+      >);
+
+      expect(mockEventService.getHeldBy).toHaveBeenCalled();
+      expect(result.statusCode).toBe(404);
+      expect(result.body).toEqual({
+        msg: "Seat seatId can not be found.",
+      });
+    });
+
+    test("must return 406 when the seat is not held by the user", async () => {
+      mockEventService.getHeldBy.mockResolvedValue("userId-1");
+      const result = await refreshHold({ params: { seatId: "seatId", eventId: "eventId" }, user } as ReqObj<
+        EmptyObj,
+        { seatId: string; eventId: string }
+      >);
+
+      expect(mockEventService.getHeldBy).toHaveBeenCalled();
+      expect(result.statusCode).toBe(406);
+      expect(result.body).toEqual({
+        msg: `Seat is not held by the user: userId`,
+      });
+    });
+
+    test("must reserve the seat with 200", async () => {
+      mockEventService.getHeldBy.mockResolvedValue("userId");
+      const result = await refreshHold({ params: { seatId: "seatId", eventId: "eventId" }, user } as ReqObj<
+        EmptyObj,
+        { seatId: string; eventId: string }
+      >);
+
+      expect(mockEventService.getHeldBy).toHaveBeenCalled();
+      expect(mockEventService.refreshHeldSeat).toHaveBeenCalled();
+      expect(result.statusCode).toBe(200);
+    });
   });
 });

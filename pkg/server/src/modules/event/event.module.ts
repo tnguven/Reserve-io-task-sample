@@ -5,7 +5,7 @@ import {
   makeGetEvents,
   makeGetSeats,
   makeHoldSeat,
-  makeReserveEvent,
+  makeReserveSeat,
   makeRefreshHold
 } from "./event.controller";
 import { makeEventService } from "./event.service";
@@ -21,7 +21,7 @@ export const getEvent = makeGetEvent(dependencies);
 export const getEvents = makeGetEvents(dependencies);
 export const getSeats = makeGetSeats(dependencies);
 export const holdSeat = makeHoldSeat(dependencies);
-export const reserveEvent = makeReserveEvent(dependencies);
+export const reserveSeat = makeReserveSeat(dependencies);
 export const refreshHold = makeRefreshHold(dependencies);
 
 export { CreateEventSchema, GetEventIdParamSchema, HoldEventSchema } from "./event.validate";

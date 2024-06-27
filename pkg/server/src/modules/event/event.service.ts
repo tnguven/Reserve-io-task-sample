@@ -5,7 +5,7 @@ import { limitsConfig } from "../../configs";
 
 export type EventServiceType = ReturnType<typeof makeEventService>;
 
-type DepsType = {
+export type DepsType = {
   dbClient: DbClient;
   generateId: () => string;
 };

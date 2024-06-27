@@ -112,6 +112,7 @@ export const makeHoldSeat =
           body: { msg: `User can hold a maximum of ${limitsConfig.maxHoldsPerUser} seats.` },
         };
       }
+
       if (await eventService.seatNotAvailable(eventId, userId, seatId)) {
         return {
           statusCode: httpStatus.BAD_REQUEST,
@@ -130,7 +131,7 @@ export const makeHoldSeat =
     }
   };
 
-export const makeReserveEvent =
+export const makeReserveSeat =
   ({ logger, eventService }: DepsType) =>
   async (req: ReqObj<EmptyObj, { seatId: string; eventId: string }>) => {
     const { eventId, seatId } = req.params;
@@ -141,7 +142,7 @@ export const makeReserveEvent =
       if (heldBy === null) {
         return {
           statusCode: httpStatus.NOT_FOUND,
-          body: { msg: `Seat ${seatId} can not be found.` },
+          body: { msg: `Seat ${seatId} can not be found in hold.` },
         };
       }
       if (heldBy !== userId) {
