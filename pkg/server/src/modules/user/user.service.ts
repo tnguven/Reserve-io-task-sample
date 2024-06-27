@@ -60,6 +60,12 @@ export const makeUserService = ({ dbClient, hashPassword, generateId, secrets }:
   async deleteUserById(id: string) {
     const user = await this.getUserById(id);
     if (user === null) return null;
-    await Promise.all([dbClient.del(`user:${id}`), dbClient.del(`email:${user?.email}`)]);
+
+    const multi = dbClient.multi();
+    multi.del(`user:${id}`);
+    multi.del(`email:${user?.email}`);
+    const res = await multi.exec();
+
+    return res;
   },
 });

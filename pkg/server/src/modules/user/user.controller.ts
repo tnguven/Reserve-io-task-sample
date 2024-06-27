@@ -7,7 +7,7 @@ import type { UserCreateInput } from "./user.validation";
 
 import httpStatus from "http-status"; // keep status as modules because of all static with no logic
 
-type DepsType = {
+export type DepsType = {
   userService: UserServiceType;
   authService: AuthServiceType;
   logger: Logger;
@@ -47,10 +47,7 @@ export const makeSignInUser =
           statusCode: httpStatus.CONFLICT,
         };
       }
-
       const user = await userService.createUser(req.body);
-      logger.info(user, "SignInUser: User created and authenticated successfully");
-
       return {
         statusCode: httpStatus.CREATED,
         body: user,
@@ -67,7 +64,6 @@ export const makeLoginUser =
     const { email, password } = req.body;
     try {
       const user = await userService.getUserByEmailPassword(email, password);
-
       if (user === null)
         return {
           statusCode: httpStatus.UNAUTHORIZED,
@@ -105,11 +101,11 @@ export const makeDeleteUserByID =
     if (!id) return { statusCode: httpStatus.UNAUTHORIZED };
 
     try {
-      const res = await userService.deleteUserById(id);
-      if (res === null) {
+      const result = await userService.deleteUserById(id);
+      if (result === null) {
         logger.warn({ id }, "DeleteUserByID: user not found");
         return {
-          statusCode: httpStatus.NOT_FOUND,
+          statusCode: httpStatus.UNPROCESSABLE_ENTITY,
         };
       }
 
