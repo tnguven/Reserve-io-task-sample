@@ -15,14 +15,18 @@ import {
 import { validate } from "../middleware/validate";
 import { withRateLimit } from "../middleware/rate-limit";
 import { EmptyObj } from "../types";
-import type { CreateEventInput } from "../modules/event/event.validate";
+import { CreateEventInput, GetEventsQuerySchema } from "../modules/event/event.validate";
 
 export const eventsRouter = Router();
 
 eventsRouter
   .route("/")
-  .get(makeExpressCallback(getEvents))
-  .post(withRateLimit(), validate(CreateEventSchema), makeExpressCallback<CreateEventInput>(createEvent));
+  .get(validate(GetEventsQuerySchema), makeExpressCallback(getEvents))
+  .post(
+    withRateLimit(),
+    validate(CreateEventSchema),
+    makeExpressCallback<CreateEventInput, EmptyObj, { limit: string; offset: string }>(createEvent),
+  );
 
 eventsRouter
   .route("/:eventId")

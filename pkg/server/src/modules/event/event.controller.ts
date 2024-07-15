@@ -1,5 +1,5 @@
 import type { Logger } from "pino";
-import type { EmptyObj, ReqObj } from "../../types";
+import type { EmptyObj, ReqObj, ResObj } from "../../types";
 import type { CreateEventInput } from "./event.validate";
 import type { EventServiceType } from "./event.service";
 import type { LimitsConfig } from "../../configs";
@@ -14,8 +14,9 @@ export type DepsType = {
 
 export const makeCreateEvent =
   ({ logger, eventService }: DepsType) =>
-  async (req: ReqObj<CreateEventInput>) => {
+  async (req: ReqObj<CreateEventInput, EmptyObj, { limit: string; offset: string }>) => {
     try {
+      console.log(req.query);
       const event = await eventService.createEvent(req.body);
       return {
         statusCode: httpStatus.CREATED,
@@ -138,25 +139,43 @@ export const makeReserveSeat =
     const userId = req.user?.id as string;
 
     try {
-      const heldBy = await eventService.getHeldBy(eventId, userId, seatId);
-      if (heldBy === null) {
+      const result = await eventService.processWithDistLock<ResObj>(
+        {
+          lockExpireTime: 6000,
+          lockKey: `locks:event:${eventId}:seat:${seatId}`,
+          lockValue: `${userId}-${Date.now()}`,
+        },
+        async () => {
+          const heldBy = await eventService.getHeldBy(eventId, userId, seatId);
+          if (heldBy === null) {
+            return {
+              statusCode: httpStatus.NOT_FOUND,
+              body: { msg: `Seat ${seatId} can not be found in hold.` },
+            };
+          }
+          if (heldBy !== userId) {
+            return {
+              statusCode: httpStatus.NOT_ACCEPTABLE,
+              body: { msg: "Seat is not held by the user." },
+            };
+          }
+
+          await eventService.reserveSeat(userId, eventId, seatId);
+          return {
+            statusCode: httpStatus.CREATED,
+            body: { msg: `Seat ${seatId} reserved for user ${userId}.` },
+          };
+        },
+      );
+
+      if (result === null) {
         return {
-          statusCode: httpStatus.NOT_FOUND,
-          body: { msg: `Seat ${seatId} can not be found in hold.` },
-        };
-      }
-      if (heldBy !== userId) {
-        return {
-          statusCode: httpStatus.NOT_ACCEPTABLE,
-          body: { msg: "Seat is not held by the user." },
-        };
+          statusCode: httpStatus.CONFLICT,
+          body: { msg: "Seat is already being reserved by another user." },
+        }
       }
 
-      await eventService.reserveSeat(userId, eventId, seatId);
-      return {
-        statusCode: httpStatus.CREATED,
-        body: { msg: `Seat ${seatId} reserved for user ${userId}.` },
-      };
+      return result;
     } catch (err) {
       logger.error({ err }, "holdEvent: an error occurred while hold event");
       throw err;

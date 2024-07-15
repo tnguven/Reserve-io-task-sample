@@ -26,3 +26,10 @@ export const HoldEventSchema = z.object({
     seatId: z.string(),
   }),
 });
+
+export const GetEventsQuerySchema = z.object({
+  query: z.object({
+    limit: z.number().max(100).default(20),
+    offset: z.number().default(0)
+  })
+})

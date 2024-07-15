@@ -109,4 +109,37 @@ export const makeEventService = ({ dbClient, generateId }: DepsType) => ({
   async refreshHeldSeat(eventId: string, userId: string, seatId: string): Promise<void> {
     await dbClient.expire(`hold:${eventId}:${userId}:${seatId}`, limitsConfig.holdDuration);
   },
+
+  async processWithDistLock<T>(
+    {
+      lockKey,
+      lockValue,
+      lockExpireTime,
+    }: {
+      lockKey: string;
+      lockValue: string;
+      lockExpireTime: number;
+    },
+    cb: () => Promise<T>,
+  ) {
+    try {
+      const lockAcquired = await dbClient.set(lockKey, lockKey, {
+        NX: true,
+        PX: lockExpireTime,
+      });
+
+      if (!lockAcquired) {
+        return null;
+      }
+
+      return cb();
+    } catch (err) {
+      // Release the lock
+      const lockValueStored = await dbClient.get(lockKey);
+      if (lockValueStored === lockValue) {
+        await dbClient.del(lockKey);
+      }
+      throw err;
+    }
+  },
 });

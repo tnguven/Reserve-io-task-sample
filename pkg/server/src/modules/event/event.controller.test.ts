@@ -12,6 +12,7 @@ import {
 } from "./event.controller";
 import type { EmptyObj, ReqObj } from "types";
 import type { CreateEventInput } from "./event.validate";
+import { beforeEach } from "node:test";
 
 describe("Event Controller", () => {
   const limitsConfig = {
@@ -33,6 +34,7 @@ describe("Event Controller", () => {
     getHeldBy: vi.fn(),
     reserveSeat: vi.fn(),
     refreshHeldSeat: vi.fn(),
+    processWithDistLock: vi.fn(),
   };
   const deps = {
     logger: mockLogger,
@@ -225,12 +227,41 @@ describe("Event Controller", () => {
       reserveSeat = makeReserveSeat(deps);
     });
 
-    test("must return 404 when the seat is not held anymore", async () => {
-      mockEventService.getHeldBy.mockResolvedValue(null);
+    afterEach(() => {
+      vi.clearAllMocks();
+    });
+
+    test("must return 409 conflict if the seat is locked via another user", async () => {
+      mockEventService.processWithDistLock.mockImplementation(() => {
+        return null;
+      });
+
       const result = await reserveSeat({ params: { seatId: "seatId", eventId: "eventId" }, user } as ReqObj<
         EmptyObj,
         { seatId: string; eventId: string }
       >);
+
+      expect(result.statusCode).toBe(409);
+      expect(result.body).toEqual({
+        msg: "Seat is already being reserved by another user.",
+      });
+    });
+
+    test("must return 404 when the seat is not held anymore", async () => {
+      mockEventService.getHeldBy.mockResolvedValue(null);
+
+      const mockWrapper = mockEventService.processWithDistLock.mockImplementation(async ({}, callback) => {
+        return callback();
+      });
+
+      const result = await mockWrapper(
+        {},
+        async () =>
+          await reserveSeat({ params: { seatId: "seatId", eventId: "eventId" }, user } as ReqObj<
+            EmptyObj,
+            { seatId: string; eventId: string }
+          >),
+      );
 
       expect(mockEventService.getHeldBy).toHaveBeenCalled();
       expect(result.statusCode).toBe(404);
@@ -241,10 +272,19 @@ describe("Event Controller", () => {
 
     test("must return 406 when the seat is not held by the user", async () => {
       mockEventService.getHeldBy.mockResolvedValue("userId-1");
-      const result = await reserveSeat({ params: { seatId: "seatId", eventId: "eventId" }, user } as ReqObj<
-        EmptyObj,
-        { seatId: string; eventId: string }
-      >);
+
+      const mockWrapper = mockEventService.processWithDistLock.mockImplementation(async ({}, callback) => {
+        return callback();
+      });
+
+      const result = await mockWrapper(
+        {},
+        async () =>
+          await reserveSeat({ params: { seatId: "seatId", eventId: "eventId" }, user } as ReqObj<
+            EmptyObj,
+            { seatId: string; eventId: string }
+          >),
+      );
 
       expect(mockEventService.getHeldBy).toHaveBeenCalled();
       expect(result.statusCode).toBe(406);
@@ -255,10 +295,17 @@ describe("Event Controller", () => {
 
     test("must reserve the seat with 201", async () => {
       mockEventService.getHeldBy.mockResolvedValue("userId");
-      const result = await reserveSeat({ params: { seatId: "seatId", eventId: "eventId" }, user } as ReqObj<
-        EmptyObj,
-        { seatId: string; eventId: string }
-      >);
+
+      const mockWrapper = mockEventService.processWithDistLock.mockImplementation(async ({}, callback) => {
+        return callback();
+      });
+
+      const result = await mockWrapper({}, async () =>
+        reserveSeat({ params: { seatId: "seatId", eventId: "eventId" }, user } as ReqObj<
+          EmptyObj,
+          { seatId: string; eventId: string }
+        >),
+      );
 
       expect(mockEventService.getHeldBy).toHaveBeenCalled();
       expect(mockEventService.reserveSeat).toHaveBeenCalled();
